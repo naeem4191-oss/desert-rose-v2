@@ -418,13 +418,14 @@ function update(t, time, dt) {
   pos.set(c[0], c[1], c[2]); tgt.set(c[3], c[4], c[5]);
   let shift = c[6], lift = 0;
   const fit = track(K.fit, t), tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
-  const dFit = Math.max(ROSE_HALF_H / (tanV * FIT_H), ROSE_HALF_W / (tanV * camera.aspect * FIT_W));
-  const dKey = pos.distanceTo(tgt) * (camera.aspect < 1 ? 1 + (1 - camera.aspect) * 1.1 : 1);
+  const fitW = camera.aspect < 1 ? FIT_W - .1 * smooth((t - 6.9) / .4) : FIT_W;   // portrait: smaller rose for the tall product card
+  const dFit = Math.max(ROSE_HALF_H / (tanV * FIT_H), ROSE_HALF_W / (tanV * camera.aspect * fitW));
+  const dKey = pos.distanceTo(tgt) * (camera.aspect < 1 ? 1 + (1 - camera.aspect) * 2.2 : 1);
   const intro = REDUCED ? 0 : 1 - EASE.out(clamp01((time - introAt) / 3.2));
   v3.subVectors(pos, tgt).setLength((dKey + (dFit - dKey) * fit) * (1 + intro * .35));
   pos.copy(tgt).add(v3);
   if (storm > 0) { pos.x += Math.sin(time * 23) * .025 * storm; pos.y += Math.sin(time * 31) * .018 * storm; }
-  if (camera.aspect < 1) { shift = 0; lift = .17 * (1 - (t > 4 && t < 4.6 ? smooth((t - 4) / .5) : 0)); }   // centre again for the dive
+  if (camera.aspect < 1) { shift = 0; lift = (.17 + .07 * smooth((t - 6.9) / .4)) * (1 - (t > 4 && t < 4.6 ? smooth((t - 4) / .5) : 0)); }   // centre again for the dive
   camera.position.copy(pos); camera.lookAt(tgt);
   camera.setViewOffset(W, H, -shift * W, lift * H, W, H);
   sky.position.copy(camera.position);

@@ -89,14 +89,15 @@ dt{font:400 12px/1.3 var(--sans);color:var(--muted);padding-top:3px}
 footer{position:relative;z-index:4;padding:28px 8vw;font:400 12px var(--sans);color:var(--muted);border-top:1px solid var(--line);background:var(--ink)}
 
 @media(max-width:760px){
-  header{padding:16px}nav{display:none}.rail{right:12px}
-  .pin,.pin.r,.pin.c,.pin.b{align-items:flex-end;justify-content:flex-start;text-align:left;padding:0 16px 9vh}
+  header{padding:16px}nav{display:none}.rail{display:none}
+  .pin,.pin.r,.pin.c,.pin.b{align-items:flex-end;justify-content:flex-start;text-align:left;padding:0}
   .pin.r .card{text-align:left}.pin.r .card p{margin-left:0}.pin.r .chips{justify-content:flex-start}
-  .card{background:linear-gradient(180deg,rgba(18,14,11,0),rgba(18,14,11,.82) 18%);padding:28px 4px 4px;max-width:none}
+  /* full-bleed soft scrim behind the text, in the page's plum (sand over the desert) */
+  .card{width:100%;max-width:none;padding:22vh 16px max(7vh,env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(58,34,53,0),rgba(58,34,53,.55) 35%,rgba(58,34,53,.9) 70%)}
   h1{font-size:64px}h2{font-size:42px}
-  .hot span{display:none}
+  .hot{display:none}
   .card dl,.card .hint{display:none}
-  .card.ink{background:linear-gradient(180deg,rgba(236,218,190,0),rgba(236,218,190,.86) 18%)}
+  .card.ink{background:linear-gradient(180deg,rgba(236,218,190,0),rgba(236,218,190,.6) 35%,rgba(236,218,190,.9) 70%)}
 }
 @media(prefers-reduced-motion:reduce){.card>*{transition:none}}
 </style>
