@@ -16,8 +16,12 @@ const VIDEO_SRC = 'assets/museum.mp4';
 const MOBILE = matchMedia('(max-width: 760px)').matches;
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const START_Y = -1.0;       // rose depth when buried
-const SWAP_T = 1.7;         // timeline point where the sandstorm hides the desert → gallery switch
+const BG_GRAD = new URLSearchParams(location.search).get('bg') === 'grad';   // review switch: ?bg=grad
+const SWAP_T = 1.6;         // timeline point where the sandstorm hides the desert → gallery switch
 const R0 = .6;              // rose heading while in the desert
+// Rose framing: a full-size rose fills this share of the viewport height (desktop)
+// or width (portrait), whatever the window shape. Close-ups opt out via K.fit.
+const FIT_H = .42, FIT_W = .7, ROSE_HALF_H = .97, ROSE_HALF_W = 1;
 
 // ---------- timeline helpers ----------
 const clamp01 = x => Math.min(Math.max(x, 0), 1);
@@ -41,28 +45,27 @@ const K = {
   cam: [[0, [0, .55, 5.6, 0, .4, 0, .14]],
         [.95, [2.3, 1.35, 4.6, 0, .95, 0, .2]],
         [SWAP_T, [2.8, 1.5, 3.2, 0, 1, 0, .1]],
-        [2.25, [-2.6, 1.7, 4.4, 0, .95, 0, -.2]],
+        [2, [-2.6, 1.7, 4.4, 0, .95, 0, -.2]],
         [3, [1.25, 1.6, 2.45, 0, 1.05, 0, -.24]],
         [4, [0, 3.8, 2.3, 0, .95, 0, .2]],
         [4.62, [0, 1.42, .16, 0, .95, -.1, 0], 'in'],
         [5.9, [0, 2.4, 4.6, 0, .5, 0, .18]],
-        [6.65, [.4, 1.9, 3.8, 0, .4, 0, .18]],
+        [6.45, [.4, 1.9, 3.8, 0, .4, 0, .18]],
         [7.35, [0, 1.6, 6.4, 0, 1.05, 0, .18]]],
-  fog: [[0, .0065], [1.2, .009], [SWAP_T, .6, 'in'], [2.15, 0, 'out']],
-  storm: [[1.15, 0], [SWAP_T, 1, 'in'], [2.15, 0, 'out']],
-  resin: [[2.1, 0], [3, 1]],
-  exposure: [[0, .82], [SWAP_T, .82], [2, 1], [4.05, 1], [4.6, 3.4, 'in'], [4.62, 1]],
+  fog: [[0, .0065], [1.15, .009], [SWAP_T, .6, 'in'], [1.95, 0, 'out']],
+  storm: [[1.1, 0], [SWAP_T, 1, 'in'], [1.95, 0, 'out']],
+  resin: [[2, 0], [3, 1]],
+  exposure: [[0, .82], [SWAP_T, .82], [1.95, 1], [4.05, 1], [4.6, 3.4, 'in'], [4.62, 1]],
   bloom: [[0, .2], [4.05, .2], [4.6, 1.5, 'in'], [4.62, .25]],
   flash: [[4.4, 0], [4.6, 1, 'in'], [4.95, 0, 'out']],
   video: [[4.56, 0], [4.6, 1, 'lin']],
   iris: [[5.85, 1], [6.15, 0, 'in']],
   hots: [[2.7, 0], [2.85, 1], [3.35, 1], [3.5, 0]],
-  tint: [[0, [1, .8, .6]], [5.9, [1, .8, .6]], [6.05, [.9, .12, .3]], [6.85, [.9, .12, .3]], [7.2, [1, .85, .68]]],
-  homeY: [[5.85, 1.35], [6.45, .045]],
+  homeY: [[5.85, 1.35], [6.3, .045]],
   roseScale: [[5.8, 1], [5.85, .42], [6.9, .42], [7.2, 1]],
-  lid: [[5.85, [0, 1.9, .35]], [6.4, [0, 1.9, .35]], [6.7, [0, .84, 0]], [6.8, [0, .84, 0]], [7.12, [4.5, 6.5, -1.2]]],
+  lid: [[5.85, [0, 1.9, .35]], [6.2, [0, 1.9, .35]], [6.42, [0, .84, 0]], [6.8, [0, .84, 0]], [7.12, [4.5, 6.5, -1.2]]],
   unfold: [[6.85, 0], [7.12, 1]],
-  vitrine: [[7.1, 0], [7.42, 1]],
+  fit: [[2.6, 1], [3, 0], [3.6, 0], [4, 1], [4.05, 1], [4.62, 0, 'in'], [5.8, 0], [5.85, 1]],   // 0 = keyframed close-up
 };
 
 // ---------- renderer / scene ----------
@@ -83,17 +86,20 @@ const sun = new THREE.DirectionalLight(0xffc68a, 3.2);
 sun.position.set(-6, 4.2, -4);
 const sky = new THREE.Mesh(new THREE.SphereGeometry(400, 48, 24), new THREE.ShaderMaterial({
   side: THREE.BackSide, depthWrite: false, fog: false,
-  uniforms: { uSun: { value: sun.position.clone().normalize() }, uStudio: { value: 0 }, uTint: { value: new THREE.Vector3(1, .8, .6) } },
+  uniforms: { uSun: { value: sun.position.clone().normalize() }, uStudio: { value: 0 }, uGrad: { value: BG_GRAD ? 1 : 0 }, uRes: { value: new THREE.Vector2(1, 1) } },
   vertexShader: `varying vec3 vDir; void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); gl_Position.z = gl_Position.w; }`,
   fragmentShader: `
-    uniform vec3 uSun, uTint; uniform float uStudio; varying vec3 vDir;
+    uniform vec3 uSun; uniform vec2 uRes; uniform float uStudio, uGrad; varying vec3 vDir;
     void main(){
       vec3 d = normalize(vDir); float h = d.y;
       vec3 top = vec3(.16, .3, .55), hor = vec3(1., .7, .42), low = vec3(.78, .55, .34);
       vec3 c = h > 0. ? mix(hor, top, pow(h, .45)) : mix(hor, low, pow(-h, .4));
       float s = max(dot(d, uSun), 0.);
       c += vec3(1., .72, .42) * (pow(s, 6.) * .45 + pow(s, 80.) * .8) + vec3(1., .92, .75) * smoothstep(.9993, .9997, s) * 8.;
-      vec3 studio = uTint * (.012 + .05 * exp(-pow(h - .05, 2.) * 7.));
+      // gallery backdrop: flat plum #3a2235, or a radial plum glow #5a3552 → #1f121c (linear values pre-tone-mapping)
+      vec2 q = (gl_FragCoord.xy - .5 * uRes) / uRes.y;
+      vec3 grad = mix(vec3(.1122, .0526, .0962), vec3(.0314, .0176, .0276), smoothstep(.05, .95, length(q)));
+      vec3 studio = mix(vec3(.0636, .0322, .0555), grad, uGrad);
       gl_FragColor = vec4(mix(c, studio, uStudio), 1.);
     }`
 }));
@@ -115,7 +121,10 @@ const rim = new THREE.DirectionalLight(0xdcdfff, 0); rim.position.set(-3, 3, -5)
 const manager = new THREE.LoadingManager();
 const pctEl = document.getElementById('pct'), barEl = document.getElementById('bar');
 manager.onProgress = (_, l, t) => { pctEl.textContent = Math.round(l / t * 100) + '%'; barEl.style.transform = `scaleX(${l / t})`; };
-manager.itemStart('rose.bin'); manager.itemStart(VIDEO_SRC);
+manager.itemStart('rose.bin'); manager.itemStart(VIDEO_SRC); manager.itemStart('fonts');
+// brand fonts gate the loader so the first frame is already set in Lyon / GT America
+const fontsReady = Promise.all(['400 40px "Lyon Display"', '500 40px "Lyon Display"', '400 16px "Lyon Text"', '700 16px "Lyon Text"', '400 13px "GT America"', '500 13px "GT America"']
+  .map(f => document.fonts.load(f))).catch(() => {}).finally(() => manager.itemEnd('fonts'));
 const texLoader = new THREE.TextureLoader(manager);
 const tex = (f, srgb) => { const t = texLoader.load('assets/' + f); t.anisotropy = renderer.capabilities.getMaxAnisotropy(); if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t; };
 
@@ -127,7 +136,13 @@ let pour = null;
 
 // ---------- gallery ----------
 const gallery = new THREE.Group(); gallery.visible = false; scene.add(gallery);
-const floor = new THREE.Mesh(new THREE.CircleGeometry(60, 64), new THREE.MeshStandardMaterial({ color: 0x0e0a08, roughness: .95, envMapIntensity: .2 }));
+const floor = new THREE.Mesh(new THREE.CircleGeometry(60, 64), new THREE.ShadowMaterial({ opacity: .45 }));
+// shadow-only floor: the backdrop shows through, and the shadow fades out past the pedestal so no horizon band appears
+floor.material.onBeforeCompile = sh => {
+  sh.vertexShader = sh.vertexShader.replace('void main() {', 'varying float vR;\nvoid main() {\n  vR = length(position.xy);');
+  sh.fragmentShader = sh.fragmentShader.replace('void main() {', 'varying float vR;\nvoid main() {')
+    .replace('gl_FragColor = vec4( color, opacity * ( 1.0 - getShadowMask() ) );', 'gl_FragColor = vec4( color, opacity * ( 1.0 - getShadowMask() ) * ( 1.0 - smoothstep( 1.6, 3.2, vR ) ) );');
+};
 floor.rotation.x = -Math.PI / 2; floor.position.y = -1.2; floor.receiveShadow = true; gallery.add(floor);
 const stone = stoneTexture();
 const pedestal = new THREE.Mesh(new RoundedBoxGeometry(2.8, 1.2, 2.8, 4, .03), new THREE.MeshStandardMaterial({ map: stone, color: 0x9a8a7c, roughness: .82 }));
@@ -142,12 +157,12 @@ function plaque() {
     g.addColorStop(0, '#9c7a3c'); g.addColorStop(.5, '#e2c27a'); g.addColorStop(1, '#8a6a32');
     x.fillStyle = g; x.fillRect(0, 0, 1024, 256);
     x.fillStyle = '#2a1d0c'; x.textAlign = 'center';
-    x.font = '600 76px "Cormorant Garamond", serif'; x.fillText('DESERT ROSE', 512, 118);
-    x.font = '30px "JetBrains Mono", monospace'; x.fillText('RESIN  ·  10 × 10 CM  ·  QATAR', 512, 188);
+    x.font = '500 80px "Lyon Display", Georgia, serif'; x.fillText('Desert Rose', 512, 122);
+    x.font = '400 34px "Lyon Text", Georgia, serif'; x.fillText('Resin  ·  10 × 10 cm  ·  Qatar', 512, 192);
   };
   paint();
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-  if (!x.redrawn) document.fonts.ready.then(() => { x.redrawn = true; paint(); t.needsUpdate = true; });
+  fontsReady.then(() => { paint(); t.needsUpdate = true; });
   const m = new THREE.Mesh(new THREE.PlaneGeometry(.9, .225), new THREE.MeshStandardMaterial({ map: t, metalness: .85, roughness: .35 }));
   m.position.set(0, -.42, 1.402); return m;
 }
@@ -176,12 +191,6 @@ const box = (() => {
   return { g, walls, lid };
 })();
 
-// museum vitrine
-const vitrine = new THREE.Group(); vitrine.visible = false; gallery.add(vitrine);
-const glassGeo = new THREE.BoxGeometry(2.5, 2.4, 2.5);
-const glass = new THREE.Mesh(glassGeo, new THREE.MeshPhysicalMaterial({ color: 0xffffff, roughness: .04, transparent: true, opacity: .035, envMapIntensity: 1, depthWrite: false }));
-const edges = new THREE.LineSegments(new THREE.EdgesGeometry(glassGeo), new THREE.LineBasicMaterial({ color: 0xf5dfbd, transparent: true, opacity: .45 }));
-vitrine.add(glass, edges);
 
 // ---------- the rose (photo-scanned sculpture) ----------
 const rose = new THREE.Group(); scene.add(rose);
@@ -247,14 +256,14 @@ composer.addPass(new RenderPass(scene, camera));
 const bloom = new UnrealBloomPass(new THREE.Vector2(1, 1), .2, .6, .86); composer.addPass(bloom);
 composer.addPass(new OutputPass());
 const grade = new ShaderPass({
-  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 } },
+  uniforms: { tDiffuse: { value: null }, uTime: { value: 0 }, uVig: { value: .5 } },
   vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); }`,
   fragmentShader: `
-    uniform sampler2D tDiffuse; uniform float uTime; varying vec2 vUv;
+    uniform sampler2D tDiffuse; uniform float uTime, uVig; varying vec2 vUv;
     float h(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
     void main(){
       vec4 c = texture2D(tDiffuse, vUv);
-      c.rgb *= mix(1., smoothstep(.95, .25, length(vUv - .5)), .5);
+      c.rgb *= mix(1., smoothstep(.95, .25, length(vUv - .5)), uVig);
       c.rgb += (h(vUv * 1000. + fract(uTime)) - .5) * .035;
       gl_FragColor = c;
     }`
@@ -272,9 +281,59 @@ function timeline(y) {
   let i = 0; while (i < sections.length - 1 && y >= tops[i + 1]) i++;
   return i + clamp01((y - tops[i]) / heights[i]);
 }
-document.querySelectorAll('[data-go]').forEach(a => a.addEventListener('click', e => {
-  e.preventDefault(); lenis.scrollTo(sections[+a.dataset.go], { duration: 2.2 });
-}));
+
+// ---------- chapter stepping ----------
+// Native scrolling is off (Lenis stays stopped). Each gesture plays the whole transition to the
+// next resting point, so the page never rests mid-transition. Every stop is a settled frame
+// with its card fully on screen.
+const STOPS = [0, 1, 2, 3, 4, 5.5, 6.45, 7.42];
+const tToY = t => { const i = Math.min(Math.floor(t), sections.length - 1); return tops[i] + (t - i) * heights[i]; };
+const easeSine = x => -(Math.cos(Math.PI * x) - 1) / 2;
+// seconds for a move: ~1 s per timeline unit, but the museum clip gets ~3 s per unit so it plays at a natural pace
+function moveTime(a, b) {
+  const lo = Math.min(a, b), hi = Math.max(a, b), vid = Math.max(0, Math.min(hi, 5.5) - Math.max(lo, 4.6));
+  return Math.min(.9 + (hi - lo - vid) + vid * 3.2, 6);
+}
+let cur = 0, movingSince = 0, started = false;
+function goTo(i) {
+  i = Math.max(0, Math.min(STOPS.length - 1, i));
+  if (i === cur && !movingSince) return;
+  const from = timeline(lenis.scroll);
+  cur = i; movingSince = performance.now();
+  lenis.scrollTo(tToY(STOPS[i]), { duration: REDUCED ? .5 : moveTime(from, STOPS[i]), easing: easeSine, force: true, onComplete: () => { movingSince = 0; } });
+}
+function step(dir) {
+  if (!started) return;
+  if (movingSince && performance.now() - movingSince < 700) return;   // let a move get going before a new gesture can skip ahead
+  goTo(cur + dir);
+}
+// wheel / trackpad: one step per gesture (a trackpad's inertia tail counts as the same gesture)
+let lastWheel = 0, wheelAcc = 0, wheelUsed = false;
+addEventListener('wheel', e => {
+  e.preventDefault();
+  const now = performance.now();
+  if (now - lastWheel > 220) { wheelAcc = 0; wheelUsed = false; }
+  lastWheel = now; wheelAcc += e.deltaY;
+  if (!wheelUsed && Math.abs(wheelAcc) > 24) { wheelUsed = true; step(Math.sign(wheelAcc)); }
+}, { passive: false });
+// touch: a vertical swipe steps; horizontal drags are left for turning the rose
+let touchY = 0, touchX = 0;
+addEventListener('touchstart', e => { touchY = e.touches[0].clientY; touchX = e.touches[0].clientX; }, { passive: true });
+addEventListener('touchmove', e => { if (!e.target.closest('a,button')) e.preventDefault(); }, { passive: false });
+addEventListener('touchend', e => {
+  const dy = touchY - e.changedTouches[0].clientY, dx = touchX - e.changedTouches[0].clientX;
+  if (Math.abs(dy) > 40 && Math.abs(dy) > Math.abs(dx)) step(Math.sign(dy));
+});
+addEventListener('keydown', e => {
+  const k = e.key;
+  if (k === 'ArrowDown' || k === 'PageDown' || (k === ' ' && !e.shiftKey)) step(1);
+  else if (k === 'ArrowUp' || k === 'PageUp' || (k === ' ' && e.shiftKey)) step(-1);
+  else if (k === 'Home') goTo(0);
+  else if (k === 'End') goTo(STOPS.length - 1);
+  else return;
+  e.preventDefault();
+});
+document.querySelectorAll('[data-go]').forEach(a => a.addEventListener('click', e => { e.preventDefault(); if (started) goTo(+a.dataset.go); }));
 const io = new IntersectionObserver(es => es.forEach(e => e.target.classList.toggle('in', e.isIntersecting)), { threshold: .35 });
 document.querySelectorAll('.card').forEach(c => io.observe(c));
 
@@ -288,19 +347,20 @@ addEventListener('pointerup', () => drag.down = false);
 let W = 1, H = 1;
 function resize() {
   W = innerWidth; H = innerHeight;
-  renderer.setSize(W, H); composer.setSize(W, H); bloom.resolution.set(W, H);
+  sky.material.uniforms.uRes.value.set(W * renderer.getPixelRatio(), H * renderer.getPixelRatio()); renderer.setSize(W, H); composer.setSize(W, H); bloom.resolution.set(W, H);
   camera.aspect = W / H; camera.updateProjectionMatrix();
   vCan.width = W * Math.min(devicePixelRatio, 2); vCan.height = H * Math.min(devicePixelRatio, 2); drawVideo();
   measure();
+  if (started && !movingSince) lenis.scrollTo(tToY(STOPS[cur]), { immediate: true, force: true });   // stay on the current stop
 }
 addEventListener('resize', resize); resize();
 
 // ---------- frame ----------
-const hud = { count: document.getElementById('count'), nav: [...document.querySelectorAll('nav a')], prog: document.getElementById('prog'),
+const hud = { nav: [...document.querySelectorAll('nav a')], prog: document.getElementById('prog'),
   flash: document.getElementById('flash'), hots: [...document.querySelectorAll('.hot')] };
 const CH = [1, 1, 2, 2, 3, 3, 4, 5];
 const pos = new THREE.Vector3(), tgt = new THREE.Vector3(), v3 = new THREE.Vector3();
-let introAt = 0, started = false, lastNow = 0, lastCh = 0;
+let introAt = 0, lastNow = 0, lastCh = 0;
 
 function update(t, time, dt) {
   const inDesert = t < SWAP_T;
@@ -310,7 +370,7 @@ function update(t, time, dt) {
   // atmosphere + light
   scene.fog.density = track(K.fog, t);
   sky.material.uniforms.uStudio.value = inDesert ? 0 : 1;
-  sky.material.uniforms.uTint.value.fromArray(track(K.tint, t));
+  grade.uniforms.uVig.value = inDesert ? .5 : 0;   // the gallery backdrop stays one colour edge to edge
   hemi.color.setHex(inDesert ? 0x9fb6e0 : 0xffe2c4); hemi.groundColor.setHex(inDesert ? 0xa8743f : 0x2a1a10);
   sun.intensity = inDesert ? 2.1 : 0; hemi.intensity = inDesert ? .45 : .12;
   fill.intensity = inDesert ? .22 : .3; spot.intensity = inDesert ? 0 : 3.4; rim.intensity = inDesert ? 0 : .7;
@@ -348,21 +408,23 @@ function update(t, time, dt) {
   if (!drag.down) { drag.angle += drag.vel; drag.vel *= .94; }
   rose.rotation.y = inDesert ? R0 : R0 + (t - SWAP_T) * 1.1 + time * .05 + drag.angle;
 
-  // gift box + vitrine
+  // gift box
   box.g.visible = t > 5.8;
   const lid = track(K.lid, t); box.lid.position.set(lid[0], lid[1], 0); box.lid.rotation.set(0, 0, lid[2]);
   const un = track(K.unfold, t); box.walls.forEach(w => w.rotation.x = un * Math.PI / 2);
-  const vt = track(K.vitrine, t);
-  vitrine.visible = vt > .001; vitrine.position.y = 1.25 + (1 - vt) * 4; glass.material.opacity = .035 * vt; edges.material.opacity = .45 * vt;
 
   // camera
   const c = track(K.cam, t);
   pos.set(c[0], c[1], c[2]); tgt.set(c[3], c[4], c[5]);
   let shift = c[6], lift = 0;
+  const fit = track(K.fit, t), tanV = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  const dFit = Math.max(ROSE_HALF_H / (tanV * FIT_H), ROSE_HALF_W / (tanV * camera.aspect * FIT_W));
+  const dKey = pos.distanceTo(tgt) * (camera.aspect < 1 ? 1 + (1 - camera.aspect) * 1.1 : 1);
   const intro = REDUCED ? 0 : 1 - EASE.out(clamp01((time - introAt) / 3.2));
-  pos.z += intro * 2.4; pos.y += intro * .5;
+  v3.subVectors(pos, tgt).setLength((dKey + (dFit - dKey) * fit) * (1 + intro * .35));
+  pos.copy(tgt).add(v3);
   if (storm > 0) { pos.x += Math.sin(time * 23) * .025 * storm; pos.y += Math.sin(time * 31) * .018 * storm; }
-  if (camera.aspect < 1) { pos.sub(tgt).multiplyScalar(1 + (1 - camera.aspect) * 1.1).add(tgt); shift = 0; lift = .17 * (1 - (t > 4 && t < 4.6 ? smooth((t - 4) / .5) : 0)); }   // centre again for the dive
+  if (camera.aspect < 1) { shift = 0; lift = .17 * (1 - (t > 4 && t < 4.6 ? smooth((t - 4) / .5) : 0)); }   // centre again for the dive
   camera.position.copy(pos); camera.lookAt(tgt);
   camera.setViewOffset(W, H, -shift * W, lift * H, W, H);
   sky.position.copy(camera.position);
@@ -372,7 +434,7 @@ function update(t, time, dt) {
   vLayer.style.opacity = vo;
   vLayer.style.clipPath = iris < 1 ? `circle(${iris * 75}% at 50% 50%)` : 'none';
   if (vo > 0) {
-    const f = clamp01((t - 4.6) / 1.25);
+    const f = clamp01((t - 4.6) / .9);
     scrubVideo(f); vCan.style.transform = `scale(${1.08 - .08 * f})`;
   }
   hud.flash.style.opacity = track(K.flash, t);
@@ -389,7 +451,7 @@ function update(t, time, dt) {
 
   // HUD
   const ch = CH[Math.min(Math.floor(t), 7)];
-  if (ch !== lastCh) { lastCh = ch; hud.count.textContent = `0${ch} / 05`; hud.nav.forEach((a, i) => a.classList.toggle('on', i === ch - 1)); }
+  if (ch !== lastCh) { lastCh = ch; hud.nav.forEach((a, i) => a.classList.toggle('on', i === ch - 1)); }
   hud.prog.style.transform = `scaleY(${clamp01(lenis.scroll / (document.documentElement.scrollHeight - H))})`;
 
   return vo >= 1 && iris >= 1 && track(K.flash, t) < .01;   // true when the video fully covers the 3D scene
@@ -410,8 +472,9 @@ manager.onLoad = () => {
   if (started) return; started = true;
   measure(); introAt = performance.now() / 1000;
   document.body.classList.add('ready');
-  lenis.start();
+  // Lenis stays stopped: scrolling only happens through goTo().
   // deep link for review: index.html#t=4.3 jumps to that point in the timeline
   const m = location.hash.match(/t=([\d.]+)/);
-  if (m) { const t = +m[1], i = Math.min(Math.floor(t), sections.length - 1); lenis.scrollTo(tops[i] + (t - i) * heights[i], { immediate: true, force: true }); introAt = -99; }
+  if (m) { const t = +m[1], i = Math.min(Math.floor(t), sections.length - 1); lenis.scrollTo(tops[i] + (t - i) * heights[i], { immediate: true, force: true }); introAt = -99;
+    cur = STOPS.reduce((b, s, k) => Math.abs(s - t) < Math.abs(STOPS[b] - t) ? k : b, 0); }
 };

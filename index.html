@@ -5,13 +5,20 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>The Desert Rose</title>
 <meta name="description" content="Formed by time, captured in resin. The desert rose of Qatar and the museum it inspired.">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Inter:wght@400;500&family=JetBrains+Mono:wght@400&display=swap" rel="stylesheet">
 <style>
-:root{--ink:#120e0b;--cream:#f3e9d9;--muted:#bba994;--sand:#d2ae7f;--maroon:#8a1538;--line:rgba(243,233,217,.16);--ease:cubic-bezier(.2,.7,.1,1)}
+/* QC+ typography. Font files live in fonts/, which is git-ignored: the Grilli Type web licence
+   forbids uploading GT America to public repositories, and the Lyon files here are the desktop
+   OTFs (the web licence covers the separately delivered WOFF/WOFF2 files). */
+@font-face{font-family:"Lyon Display";src:url(fonts/LyonArabicDisplay-Regular.otf) format("opentype");font-weight:400;font-display:swap}
+@font-face{font-family:"Lyon Display";src:url(fonts/LyonArabicDisplay-Medium.otf) format("opentype");font-weight:500;font-display:swap}
+@font-face{font-family:"Lyon Text";src:url(fonts/LyonArabicText-RegularNo2.otf) format("opentype");font-weight:400;font-display:swap}
+@font-face{font-family:"Lyon Text";src:url(fonts/LyonArabicText-Bold.otf) format("opentype");font-weight:700;font-display:swap}
+@font-face{font-family:"GT America";src:url(fonts/GT-America-Standard-Regular.woff2) format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"GT America";src:url(fonts/GT-America-Standard-Medium.woff2) format("woff2");font-weight:500;font-display:swap}
+:root{--display:"Lyon Display",Georgia,"Times New Roman",serif;--text:"Lyon Text",Georgia,"Times New Roman",serif;--sans:"GT America","Helvetica Neue",Arial,sans-serif;--ink:#120e0b;--cream:#f3e9d9;--muted:#bba994;--sand:#d2ae7f;--maroon:#8a1538;--plum:#3a2235;--white:#fff;--coral:#ff536d;--line:rgba(243,233,217,.16);--ease:cubic-bezier(.2,.7,.1,1)}
 *{box-sizing:border-box;margin:0;padding:0}
-html.lenis,html.lenis body{height:auto}.lenis.lenis-smooth{scroll-behavior:auto!important}
-body{background:var(--ink);color:var(--cream);font:16px/1.65 Inter,system-ui,sans-serif;-webkit-font-smoothing:antialiased;overflow-x:hidden}
+html.lenis,html.lenis body{height:auto}.lenis.lenis-stopped{overflow:hidden}.lenis.lenis-smooth{scroll-behavior:auto!important}
+body{background:var(--ink);color:var(--cream);font:400 16px/1.3 var(--text);font-synthesis:none;font-variant-numeric:lining-nums tabular-nums;-webkit-font-smoothing:antialiased;overflow-x:clip}
 body:not(.ready){overflow:hidden}
 body.grab{cursor:grab}
 #gl{position:fixed;inset:0;width:100vw;height:100vh;display:block;z-index:0}
@@ -19,10 +26,10 @@ body.grab{cursor:grab}
 /* loader */
 #loader{position:fixed;inset:0;z-index:50;background:var(--ink);display:grid;place-content:center;justify-items:center;gap:20px;transition:opacity 1.2s var(--ease),visibility 1.2s}
 .ready #loader{opacity:0;visibility:hidden}
-#loader h3{font:italic 400 clamp(28px,4vw,40px)/1 "Cormorant Garamond",serif;color:var(--sand)}
+#loader h3{font:500 clamp(28px,4vw,40px)/1 var(--display);color:var(--sand)}
 #loader .track{width:220px;height:1px;background:var(--line);overflow:hidden}
 #bar{height:100%;background:var(--sand);transform:scaleX(0);transform-origin:left;transition:transform .4s}
-#pct{font:11px "JetBrains Mono",monospace;letter-spacing:.2em;color:var(--muted)}
+#pct{font:400 12px var(--sans);color:var(--muted)}
 
 /* museum video + transitions */
 #museum{position:fixed;inset:0;z-index:1;opacity:0;pointer-events:none;overflow:hidden;background:#000}
@@ -32,7 +39,7 @@ body.grab{cursor:grab}
 #flash{position:fixed;inset:0;z-index:2;pointer-events:none;opacity:0;background:radial-gradient(circle at 50% 45%,#fffaf0,#f2dcb4 45%,#d9b57f)}
 
 /* HUD */
-header{position:fixed;inset:0 0 auto;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:22px 32px;font:11px "JetBrains Mono",monospace;letter-spacing:.18em;text-transform:uppercase;color:var(--muted);opacity:0;transition:opacity 1.5s .6s}
+header{position:fixed;inset:0 0 auto;z-index:10;display:flex;align-items:center;justify-content:space-between;padding:22px 32px;font:400 13px/1 var(--sans);color:var(--muted);opacity:0;transition:opacity 1.5s .6s}
 .ready header{opacity:1}
 header .brand{color:var(--cream)}
 nav{display:flex;gap:26px}
@@ -42,20 +49,17 @@ nav a.on{color:var(--cream)}nav a.on::after{transform:scaleX(1)}
 nav a:hover{color:var(--cream)}
 .rail{position:fixed;right:32px;top:50%;height:120px;width:1px;margin-top:-60px;background:var(--line);z-index:10}
 #prog{position:absolute;inset:0;background:var(--sand);transform-origin:top;transform:scaleY(0)}
-.cue{position:absolute;left:50%;bottom:28px;transform:translateX(-50%);z-index:10;font:10px "JetBrains Mono",monospace;letter-spacing:.3em;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:10px}
-.cue::after{content:"";width:1px;height:38px;background:linear-gradient(var(--sand),transparent);animation:cue 2.2s var(--ease) infinite}
-@keyframes cue{0%{transform:scaleY(0);transform-origin:top}50%{transform:scaleY(1);transform-origin:top}51%{transform-origin:bottom}100%{transform:scaleY(0);transform-origin:bottom}}
 
 /* dark ink while over the bright desert */
-.ink{color:#20160d}.ink em{color:#8e4d1d}.card.ink p{color:#4b3825}.ink .eyebrow{color:#7d4b21}
+.ink{color:#20160d}.ink h1,.ink h2{color:var(--plum)}.card.ink p{color:#4b3825}
 .ink .chips span{border-color:rgba(32,22,13,.28);color:#2b1e11}
 body.desert header{color:#5a4430}body.desert header .brand{color:#20160d}
-body.desert .rail{background:rgba(32,22,13,.18)}body.desert .cue{color:#5a4430}
-header,.rail,.cue{transition:color .8s,background .8s,opacity 1.5s .6s}
+body.desert .rail{background:rgba(32,22,13,.18)}
+header,.rail{transition:color .8s,background .8s,opacity 1.5s .6s}
 /* hotspots */
 .hot{position:fixed;left:0;top:0;z-index:3;pointer-events:none;opacity:0}
 .hot i{position:absolute;left:-6px;top:-6px;width:12px;height:12px;border-radius:50%;border:1px solid var(--cream);background:rgba(210,174,127,.35);box-shadow:0 0 0 6px rgba(243,233,217,.08)}
-.hot span{position:absolute;right:22px;top:-11px;white-space:nowrap;font:11px "JetBrains Mono",monospace;letter-spacing:.12em;color:var(--cream);padding:4px 10px;border:1px solid var(--line);background:rgba(18,14,11,.55);backdrop-filter:blur(6px)}
+.hot span{position:absolute;right:22px;top:-11px;white-space:nowrap;font:400 12px var(--sans);color:var(--cream);padding:4px 10px;border:1px solid var(--line);background:rgba(18,14,11,.55);backdrop-filter:blur(6px)}
 .hot span::before{content:"";position:absolute;left:100%;top:50%;width:14px;height:1px;background:var(--line)}
 
 /* chapters */
@@ -68,31 +72,33 @@ section{position:relative}
 .card>*{opacity:0;transform:translateY(26px);transition:opacity 1s var(--ease),transform 1.2s var(--ease)}
 .card.in>*{opacity:1;transform:none}
 .card.in>*:nth-child(2){transition-delay:.08s}.card.in>*:nth-child(3){transition-delay:.16s}.card.in>*:nth-child(4){transition-delay:.24s}.card.in>*:nth-child(5){transition-delay:.32s}.card.in>*:nth-child(6){transition-delay:.4s}
-.eyebrow{font:11px "JetBrains Mono",monospace;letter-spacing:.22em;text-transform:uppercase;color:var(--sand)}
-h1,h2{font-family:"Cormorant Garamond",serif;font-weight:400;line-height:.98;letter-spacing:-.01em;margin:16px 0 22px}
+h1,h2{font-family:var(--display);font-weight:400;color:var(--white);line-height:1;letter-spacing:0;margin:0 0 22px}
 h1{font-size:clamp(64px,10vw,150px)}h2{font-size:clamp(42px,5.4vw,76px)}
-em{font-style:italic;color:var(--sand)}
-.card p{color:var(--muted);max-width:42ch}
+em{font-style:normal;color:var(--coral)}
+.card p{font:400 clamp(16px,1.2vw,18px)/1.3 var(--text);color:var(--muted);max-width:42ch}
+.card p.lead{font-weight:700}
+.pin.r .card{text-align:right}.pin.r .card p{margin-left:auto}.pin.r .chips{justify-content:flex-end}
 .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:22px}
-.chips span{font:10.5px "JetBrains Mono",monospace;letter-spacing:.14em;text-transform:uppercase;padding:6px 11px;border:1px solid var(--line);color:var(--cream)}
-dl{display:grid;grid-template-columns:auto 1fr;gap:8px 28px;margin:24px 0;padding:18px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font-size:14px}
-dt{font:10.5px "JetBrains Mono",monospace;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);padding-top:3px}
-.price{font:400 44px/1 "Cormorant Garamond",serif;display:flex;align-items:center;gap:22px;flex-wrap:wrap}
-.btn{display:inline-flex;align-items:center;gap:12px;font:500 14px Inter,sans-serif;letter-spacing:.04em;color:var(--ink);background:var(--sand);padding:16px 28px;text-decoration:none;transition:background .4s,transform .4s var(--ease)}
+.chips span{font:400 12px var(--sans);padding:6px 11px;border:1px solid var(--line);color:var(--cream)}
+dl{display:grid;grid-template-columns:auto 1fr;gap:8px 28px;margin:24px 0;padding:18px 0;border-top:1px solid var(--line);border-bottom:1px solid var(--line);font:400 16px/1.3 var(--text)}
+dt{font:400 12px/1.3 var(--sans);color:var(--muted);padding-top:3px}
+.price{font:500 44px/1 var(--display);display:flex;align-items:center;gap:22px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:12px;font:500 15px var(--sans);color:var(--ink);background:var(--sand);padding:16px 28px;text-decoration:none;transition:background .4s,transform .4s var(--ease)}
 .btn:hover{background:var(--cream);transform:translateY(-2px)}
-.hint{display:block;margin-top:18px;font:10.5px "JetBrains Mono",monospace;letter-spacing:.18em;text-transform:uppercase;color:var(--muted)}
-footer{position:relative;z-index:4;padding:28px 8vw;font:10.5px "JetBrains Mono",monospace;letter-spacing:.14em;color:var(--muted);border-top:1px solid var(--line);background:var(--ink)}
+.hint{display:block;margin-top:18px;font:400 12px var(--sans);color:var(--muted)}
+footer{position:relative;z-index:4;padding:28px 8vw;font:400 12px var(--sans);color:var(--muted);border-top:1px solid var(--line);background:var(--ink)}
 
 @media(max-width:760px){
   header{padding:16px}nav{display:none}.rail{right:12px}
   .pin,.pin.r,.pin.c,.pin.b{align-items:flex-end;justify-content:flex-start;text-align:left;padding:0 16px 9vh}
+  .pin.r .card{text-align:left}.pin.r .card p{margin-left:0}.pin.r .chips{justify-content:flex-start}
   .card{background:linear-gradient(180deg,rgba(18,14,11,0),rgba(18,14,11,.82) 18%);padding:28px 4px 4px;max-width:none}
   h1{font-size:64px}h2{font-size:42px}
   .hot span{display:none}
   .card dl,.card .hint{display:none}
   .card.ink{background:linear-gradient(180deg,rgba(236,218,190,0),rgba(236,218,190,.86) 18%)}
 }
-@media(prefers-reduced-motion:reduce){.card>*{transition:none}.cue::after{animation:none}}
+@media(prefers-reduced-motion:reduce){.card>*{transition:none}}
 </style>
 <script type="importmap">{"imports":{
   "three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
@@ -119,63 +125,54 @@ footer{position:relative;z-index:4;padding:28px 8vw;font:10.5px "JetBrains Mono"
     <a href="#" data-go="6">A piece of Qatar</a>
     <a href="#" data-go="7">The object</a>
   </nav>
-  <span id="count">01 / 05</span>
 </header>
 <div class="rail"><div id="prog"></div></div>
 
 <main>
   <section data-sec style="height:100vh"><div class="pin"><div class="card ink">
-    <div class="eyebrow">Qatar · An object study</div>
     <h1>Formed<br><em>by time.</em></h1>
-    <p>A desert rose takes thousands of years to grow. Scroll to watch one rise from the sand.</p>
-  </div></div><div class="cue">SCROLL</div></section>
+    <p class="lead">A desert rose takes thousands of years to grow. Scroll to watch one rise from the sand.</p>
+  </div></div></section>
 
   <section data-sec style="height:120vh"><div class="pin"><div class="card ink">
-    <div class="eyebrow">01 — Formed by time</div>
     <h2>A rose that grows <em>without water.</em></h2>
     <p>Beneath Qatar's sabkha, the coastal salt flats, groundwater rises and evaporates. Gypsum or baryte crystallises in thin blades around grains of sand, locking together into petals over millennia.</p>
     <div class="chips"><span>Gypsum · baryte</span><span>Sabkha salt flats</span><span>Millennia</span></div>
   </div></div></section>
 
   <section data-sec style="height:100vh"><div class="pin r"><div class="card">
-    <div class="eyebrow">02 — Captured in resin</div>
     <h2>The rose, <em>made to keep.</em></h2>
     <p>No two desert roses are alike, and the natural crystal is fragile. This sculpture holds its form in resin: every blade, every fold.</p>
   </div></div></section>
 
   <section data-sec style="height:100vh"><div class="pin r b"><div class="card">
-    <div class="eyebrow">02 — Captured in resin</div>
     <h2>Every petal, <em>preserved.</em></h2>
     <p>Ten centimetres across and 200 grams, small enough to hold in one hand.</p>
   </div></div></section>
 
   <section data-sec style="height:100vh"><div class="pin"><div class="card">
-    <div class="eyebrow">03 — From rose to landmark</div>
     <h2>Look <em>closer.</em></h2>
   </div></div></section>
 
   <section data-sec style="height:200vh"><div class="pin b"><div class="card">
-    <div class="eyebrow">03 — From rose to landmark</div>
     <h2>A rose the size <em>of a city.</em></h2>
     <p>Architect Jean Nouvel drew on the desert rose for the National Museum of Qatar: great curved discs, interlocking like petals, wrapped around the historic palace of Sheikh Abdullah bin Jassim Al Thani.</p>
     <div class="chips"><span>Jean Nouvel</span><span>Opened 2019</span><span>Doha</span></div>
   </div></div></section>
 
-  <section data-sec style="height:120vh"><div class="pin"><div class="card">
-    <div class="eyebrow">04 — A piece of Qatar</div>
+  <section data-sec style="height:200vh"><div class="pin"><div class="card">
     <h2>Take a piece of <em>Qatar home.</em></h2>
     <p>The desert that formed it, the museum it inspired, the visit you'll remember. Small enough to carry home.</p>
   </div></div></section>
 
   <section data-sec style="height:200vh"><div class="pin"><div class="card">
-    <div class="eyebrow">05 — The object</div>
     <h2>Desert Rose <em>Resin Sculpture</em></h2>
     <dl><dt>Material</dt><dd>Resin</dd><dt>Size</dt><dd>10 × 10 cm</dd><dt>Weight</dt><dd>200 g</dd><dt>SKU</dt><dd>TSVR004508</dd></dl>
     <div class="price">QR 90 <a class="btn" href="https://market.qacreates.com/desert-rose-resin-sculpture" target="_blank" rel="noopener">Take the Rose Home <span aria-hidden="true">↗</span></a></div>
     <span class="hint">Drag to turn the rose</span>
   </div></div></section>
 </main>
-<footer>DESERT ROSE · RESIN SCULPTURE · QATAR</footer>
+<footer>Desert Rose · Resin sculpture · Qatar</footer>
 
 <script type="module" src="js/main.js"></script>
 </body>
