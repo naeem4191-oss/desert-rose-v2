@@ -53,7 +53,7 @@ nav a:hover{color:var(--cream)}
 /* dark ink while over the bright desert */
 .ink{color:#20160d}.ink h1,.ink h2{color:var(--plum)}.card.ink p{color:#4b3825}
 .ink .chips span{border-color:rgba(32,22,13,.28);color:#2b1e11}
-body.desert header{color:#5a4430}body.desert header .brand{color:#20160d}
+body.desert header{color:#5a4430}body.desert header .brand,body.desert nav a.on,body.desert nav a:hover{color:#20160d}body.desert nav a::after{background:#20160d}
 body.desert .rail{background:rgba(32,22,13,.18)}
 header,.rail{transition:color .8s,background .8s,opacity 1.5s .6s}
 /* hotspots */
@@ -61,6 +61,7 @@ header,.rail{transition:color .8s,background .8s,opacity 1.5s .6s}
 .hot i{position:absolute;left:-6px;top:-6px;width:12px;height:12px;border-radius:50%;border:1px solid var(--cream);background:rgba(210,174,127,.35);box-shadow:0 0 0 6px rgba(243,233,217,.08)}
 .hot span{position:absolute;right:22px;top:-11px;white-space:nowrap;font:400 12px var(--sans);color:var(--cream);padding:4px 10px;border:1px solid var(--line);background:rgba(18,14,11,.55);backdrop-filter:blur(6px)}
 .hot span::before{content:"";position:absolute;left:100%;top:50%;width:14px;height:1px;background:var(--line)}
+.hot.l span{right:auto;left:22px}.hot.l span::before{left:auto;right:100%}
 
 /* chapters */
 main{position:relative;z-index:4}

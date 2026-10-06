@@ -86,10 +86,10 @@ const sun = new THREE.DirectionalLight(0xffc68a, 3.2);
 sun.position.set(-6, 4.2, -4);
 const sky = new THREE.Mesh(new THREE.SphereGeometry(400, 48, 24), new THREE.ShaderMaterial({
   side: THREE.BackSide, depthWrite: false, fog: false,
-  uniforms: { uSun: { value: sun.position.clone().normalize() }, uStudio: { value: 0 }, uGrad: { value: BG_GRAD ? 1 : 0 }, uRes: { value: new THREE.Vector2(1, 1) } },
+  uniforms: { uSun: { value: sun.position.clone().normalize() }, uStudio: { value: 0 }, uFogMix: { value: 0 }, uFog: { value: new THREE.Color() }, uGrad: { value: BG_GRAD ? 1 : 0 }, uRes: { value: new THREE.Vector2(1, 1) } },
   vertexShader: `varying vec3 vDir; void main(){ vDir = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.); gl_Position.z = gl_Position.w; }`,
   fragmentShader: `
-    uniform vec3 uSun; uniform vec2 uRes; uniform float uStudio, uGrad; varying vec3 vDir;
+    uniform vec3 uSun, uFog; uniform vec2 uRes; uniform float uStudio, uGrad, uFogMix; varying vec3 vDir;
     void main(){
       vec3 d = normalize(vDir); float h = d.y;
       vec3 top = vec3(.16, .3, .55), hor = vec3(1., .7, .42), low = vec3(.78, .55, .34);
@@ -100,7 +100,7 @@ const sky = new THREE.Mesh(new THREE.SphereGeometry(400, 48, 24), new THREE.Shad
       vec2 q = (gl_FragCoord.xy - .5 * uRes) / uRes.y;
       vec3 grad = mix(vec3(.1122, .0526, .0962), vec3(.0314, .0176, .0276), smoothstep(.05, .95, length(q)));
       vec3 studio = mix(vec3(.0636, .0322, .0555), grad, uGrad);
-      gl_FragColor = vec4(mix(c, studio, uStudio), 1.);
+      gl_FragColor = vec4(mix(mix(c, studio, uStudio), uFog, uFogMix), 1.);   // the storm hazes the backdrop too, hiding the cut
     }`
 }));
 sky.renderOrder = -1; scene.add(sky);
@@ -216,13 +216,14 @@ fetch('assets/rose.bin').then(r => r.arrayBuffer()).then(b => {
     s.forEach((v, k) => { if (v > best[k][0]) best[k] = [v, i]; });
   }
   best.forEach(([, i]) => hotPts.push(new THREE.Vector3(p.getX(i), p.getY(i), p.getZ(i))));
-  pour = createPour(roseMesh, MOBILE ? 16000 : 45000, START_Y);
+  pour = createPour(roseMesh, MOBILE ? 30000 : 90000, START_Y);
   pour.rotation.y = R0; desert.add(pour);
   manager.itemEnd('rose.bin');
 });
 
 // ---------- museum video (scroll-scrubbed) ----------
 const vLayer = document.getElementById('museum'), vCan = document.getElementById('museumCanvas'), vCtx = vCan.getContext('2d');
+const vSharp = document.createElement('canvas'), sCtx = vSharp.getContext('2d');
 const vid = document.getElementById('museumVideo');
 let vReady = false, vSeeking = false, vSeekAt = 0, vDone = false;
 const videoDone = () => { if (!vDone) { vDone = true; manager.itemEnd(VIDEO_SRC); } };
@@ -241,7 +242,18 @@ function drawVideo() {
   const draw = s => vCtx.drawImage(vid, (W - vw * s) / 2, (H - vh * s) / 2, vw * s, vh * s);
   const cover = Math.max(W / vw, H / vh), contain = Math.min(W / vw, H / vh);
   if (vw / vh >= (W / H) * .75) draw(cover);
-  else { vCtx.filter = 'blur(40px) brightness(.5)'; draw(cover * 1.1); vCtx.filter = 'none'; draw(contain); }
+  else {
+    vCtx.filter = 'blur(40px) brightness(.45)'; draw(cover * 1.1); vCtx.filter = 'none';
+    // sharp footage, feathered into the blurred fill; on wide screens it sits right of centre, clear of the text
+    const w = vw * contain, h = vh * contain, x = W > H ? Math.min(W - w * 1.05, W * .62 - w / 2) : (W - w) / 2, f = w * .14;
+    if (vSharp.width !== W || vSharp.height !== H) { vSharp.width = W; vSharp.height = H; }
+    sCtx.globalCompositeOperation = 'source-over'; sCtx.clearRect(0, 0, W, H);
+    sCtx.drawImage(vid, x, (H - h) / 2, w, h);
+    const g = sCtx.createLinearGradient(x, 0, x + w, 0);
+    g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(f / w, '#000'); g.addColorStop(1 - f / w, '#000'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    sCtx.globalCompositeOperation = 'destination-in'; sCtx.fillStyle = g; sCtx.fillRect(x, 0, w, H);
+    vCtx.drawImage(vSharp, 0, 0);
+  }
 }
 function scrubVideo(f) {
   if (!vReady || !vid.duration) return;
@@ -369,6 +381,7 @@ function update(t, time, dt) {
 
   // atmosphere + light
   scene.fog.density = track(K.fog, t);
+  sky.material.uniforms.uFog.value.copy(scene.fog.color); sky.material.uniforms.uFogMix.value = THREE.MathUtils.smoothstep(scene.fog.density, .02, .3);
   sky.material.uniforms.uStudio.value = inDesert ? 0 : 1;
   grade.uniforms.uVig.value = inDesert ? .5 : 0;   // the gallery backdrop stays one colour edge to edge
   hemi.color.setHex(inDesert ? 0x9fb6e0 : 0xffe2c4); hemi.groundColor.setHex(inDesert ? 0xa8743f : 0x2a1a10);
@@ -388,12 +401,12 @@ function update(t, time, dt) {
     du.uOffset.value.x += wind * dt; du.uOffset.value.z += wind * .25 * dt;
     du.uCenter.value.set(camera.position.x * (1 - storm) , -.1, camera.position.z * (1 - storm) - 3 * storm);
     du.uBox.value.set(30 - storm * 18, 3 + storm * 4, 30 - storm * 18);
-    du.uLow.value = 2.5 - storm * 1.5; du.uSize.value = .02 + storm * .03; du.uOpacity.value = .5 + storm * .5;
+    du.uLow.value = 2.5 - storm * 1.5; du.uSize.value = .02 + storm * .03; du.uMax.value = (4 + storm * 6) * DPR; du.uOpacity.value = .5 + storm * .5;
     du.uColor.value.setRGB(.88, .72, .5);
   } else {                                   // dust motes drifting through the spotlight
     du.uOffset.value.x += .05 * dt; du.uOffset.value.y += .03 * dt;
     du.uCenter.value.set(0, -.2, 0); du.uBox.value.set(5, 4, 5); du.uLow.value = 1;
-    du.uSize.value = .0055; du.uOpacity.value = .35 * Math.max(storm, 1 - track(K.video, t)); du.uColor.value.setRGB(1, .88, .7);
+    du.uSize.value = .0055; du.uMax.value = 3.5 * DPR; du.uOpacity.value = .35 * Math.max(storm, 1 - track(K.video, t)); du.uColor.value.setRGB(1, .88, .7);
   }
 
   // rose
@@ -446,7 +459,10 @@ function update(t, time, dt) {
     el.style.opacity = ho;
     if (ho > 0 && roseMesh && hotPts[i]) {
       v3.copy(hotPts[i]).applyMatrix4(roseMesh.matrixWorld).project(camera);
-      el.style.transform = `translate(${(v3.x * .5 + .5) * W}px, ${(-v3.y * .5 + .5) * H}px)`;
+      const x = (v3.x * .5 + .5) * W, y = (-v3.y * .5 + .5) * H;
+      el.style.transform = `translate(${x}px, ${y}px)`;
+      el.classList.toggle('l', x < W * .4);   // label on the open side of the dot
+      el.style.opacity = ho * clamp01(Math.min(x - 24, W - 24 - x, y - 70, H - 24 - y) / 40);   // fade dots that leave the frame
     }
   });
 

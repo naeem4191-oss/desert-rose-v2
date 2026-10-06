@@ -112,9 +112,9 @@ export function createPour(roseMesh, count, startY) {
   for (let i = 0; i < count; i++) {
     sampler.sample(p, n); p.addScaledVector(n, .006);
     start.set([p.x, p.y, p.z], i * 3);
-    vel.set([n.x * .35 + (Math.random() - .5) * .3, n.y * .15 + Math.random() * .2, n.z * .35 + (Math.random() - .5) * .3], i * 3);
+    vel.set([n.x * .22 + (Math.random() - .5) * .16, n.y * .12 + Math.random() * .14, n.z * .22 + (Math.random() - .5) * .16], i * 3);   // slide off, don't spray
     let e = 1; for (let t = 0; t <= 1; t += .01) if (rise(t) + p.y > .3) { e = t; break; }   // when the grain clears the sand
-    delay[i] = Math.random() < .22 ? 99 : e + Math.random() * .35;                              // some stay as dust on the rose
+    delay[i] = Math.random() < .07 ? 99 : e + Math.random() * .35;                              // a few stay as dust on the rose
     rnd.set([Math.random(), Math.random()], i * 2);
   }
   const g = new THREE.BufferGeometry();
@@ -124,8 +124,8 @@ export function createPour(roseMesh, count, startY) {
   g.setAttribute('aRnd', new THREE.BufferAttribute(rnd, 2));
   const mat = new THREE.ShaderMaterial({
     fog: true,
-    uniforms: { ...fogUniforms(), uT: { value: 0 }, uScale: { value: 1 }, uSize: { value: .0105 }, uMound: { value: 1 }, uStartY: { value: startY },
-      uC1: { value: new THREE.Color(0xd2ad7c) }, uC2: { value: new THREE.Color(0x8c6740) } },
+    uniforms: { ...fogUniforms(), uT: { value: 0 }, uScale: { value: 1 }, uSize: { value: .0058 }, uMound: { value: 1 }, uStartY: { value: startY },
+      uC1: { value: new THREE.Color(0xdcc29a) }, uC2: { value: new THREE.Color(0xa88559) } },   // the terrain's own sand tones
     vertexShader: `
       attribute vec3 aVel; attribute float aDelay; attribute vec2 aRnd;
       uniform float uT, uScale, uSize, uMound, uStartY;
@@ -140,11 +140,12 @@ export function createPour(roseMesh, count, startY) {
         float th = (aVel.y + sqrt(max(aVel.y * aVel.y + 2. * g * c, 0.))) / g;
         float tt = min(ft, th);
         vec3 p = o + aVel * tt + vec3(0., -.5 * g * tt * tt, 0.);
-        if (ft >= th) p.y = ground(p.xz) + aRnd.x * .015;
+        float settle = clamp((ft - th) / .6, 0., 1.);   // landed grains sink into the dune instead of leaving a speckled ring
+        if (ft >= th) p.y = ground(p.xz) + aRnd.x * .01 * (1. - settle);
         vec4 mvPosition = modelViewMatrix * vec4(p, 1.);
         gl_Position = projectionMatrix * mvPosition;
-        gl_PointSize = uSize * (.55 + aRnd.y * .9) * uScale / -mvPosition.z;
-        vShade = .6 + aRnd.x * .35; vTone = aRnd.y;
+        gl_PointSize = uSize * (.6 + aRnd.y * .8) * uScale / -mvPosition.z * (1. - settle);
+        vShade = .74 + aRnd.x * .22; vTone = aRnd.y;
         #include <fog_vertex>
       }`,
     fragmentShader: `
@@ -152,7 +153,7 @@ export function createPour(roseMesh, count, startY) {
       #include <fog_pars_fragment>
       void main(){
         vec2 c = gl_PointCoord * 2. - 1.; float d = dot(c, c); if (d > 1.) discard;
-        float l = vShade * (.7 + .4 * (1. - d)) * (1. + .2 * (c.y - c.x));
+        float l = vShade * (.85 + .2 * (1. - d)) * (1. + .12 * (c.y - c.x));
         gl_FragColor = vec4(mix(uC2, uC1, vTone) * l, 1.);
         #include <fog_fragment>
       }`
@@ -169,14 +170,14 @@ export function createDrift(count) {
   g.setAttribute('position', new THREE.BufferAttribute(seed, 3));
   g.setAttribute('aRnd', new THREE.BufferAttribute(rnd, 1));
   const u = { uOffset: { value: new THREE.Vector3() }, uCenter: { value: new THREE.Vector3() }, uBox: { value: new THREE.Vector3(30, 3, 30) },
-    uLow: { value: 2.5 }, uOpacity: { value: .5 }, uScale: { value: 1 }, uSize: { value: .02 }, uStretch: { value: 0 },
+    uLow: { value: 2.5 }, uMax: { value: 6 }, uOpacity: { value: .5 }, uScale: { value: 1 }, uSize: { value: .02 }, uStretch: { value: 0 },
     uColor: { value: new THREE.Color(0xe0c08f) }, uTime: { value: 0 } };
   const mat = new THREE.ShaderMaterial({
     fog: true, transparent: true, depthWrite: false,
     uniforms: { ...fogUniforms(), ...u },
     vertexShader: `
       attribute float aRnd;
-      uniform vec3 uOffset, uCenter, uBox; uniform float uLow, uScale, uSize, uTime;
+      uniform vec3 uOffset, uCenter, uBox; uniform float uLow, uScale, uSize, uTime, uMax;
       varying float vA, vR;
       #include <fog_pars_vertex>
       void main(){
@@ -188,6 +189,8 @@ export function createDrift(count) {
         vec4 mvPosition = modelViewMatrix * vec4(p, 1.);
         gl_Position = projectionMatrix * mvPosition;
         gl_PointSize = uSize * (.5 + aRnd) * uScale / -mvPosition.z;
+        vA *= 1. - smoothstep(uMax, uMax * 1.8, gl_PointSize);   // near-camera specks would read as out-of-focus blobs
+        gl_PointSize = min(gl_PointSize, uMax * 1.8);
         #include <fog_vertex>
       }`,
     fragmentShader: `
