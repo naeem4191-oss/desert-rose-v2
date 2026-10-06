@@ -114,7 +114,7 @@ export function createPour(roseMesh, count, startY) {
     start.set([p.x, p.y, p.z], i * 3);
     vel.set([n.x * .22 + (Math.random() - .5) * .16, n.y * .12 + Math.random() * .14, n.z * .22 + (Math.random() - .5) * .16], i * 3);   // slide off, don't spray
     let e = 1; for (let t = 0; t <= 1; t += .01) if (rise(t) + p.y > .3) { e = t; break; }   // when the grain clears the sand
-    delay[i] = Math.random() < .07 ? 99 : e + Math.random() * .35;                              // a few stay as dust on the rose
+    delay[i] = Math.min(e + Math.random() * .2, .8);                                            // every grain lets go before the t = 1 stop
     rnd.set([Math.random(), Math.random()], i * 2);
   }
   const g = new THREE.BufferGeometry();
@@ -134,17 +134,17 @@ export function createPour(roseMesh, count, startY) {
       float rise(float t){ float s = clamp(t, 0., 1.); return uStartY * (1. - s * s * (3. - 2. * s)); }
       float ground(vec2 xz){ return uMound * ${MOUND_A.toFixed(3)} * exp(-dot(xz, xz) / ${MOUND_S.toFixed(3)}); }
       void main(){
-        float g = 4.5, ft = max(uT - aDelay, 0.) * 2.6;
+        float g = 4.5, ft = max(uT - aDelay, 0.) * 3.4;
         vec3 o = position + vec3(0., rise(min(uT, aDelay)), 0.);
         float c = o.y - ground(o.xz);
         float th = (aVel.y + sqrt(max(aVel.y * aVel.y + 2. * g * c, 0.))) / g;
         float tt = min(ft, th);
         vec3 p = o + aVel * tt + vec3(0., -.5 * g * tt * tt, 0.);
-        float settle = clamp((ft - th) / .6, 0., 1.);   // landed grains sink into the dune instead of leaving a speckled ring
+        float settle = clamp((ft - th) / .35, 0., 1.);   // landed grains sink into the dune instead of leaving a speckled ring
         if (ft >= th) p.y = ground(p.xz) + aRnd.x * .01 * (1. - settle);
         vec4 mvPosition = modelViewMatrix * vec4(p, 1.);
         gl_Position = projectionMatrix * mvPosition;
-        gl_PointSize = uSize * (.6 + aRnd.y * .8) * uScale / -mvPosition.z * (1. - settle);
+        gl_PointSize = uSize * (.6 + aRnd.y * .8) * uScale / -mvPosition.z * (1. - settle) * (1. - smoothstep(.9, .97, uT));   // rose is clean at the stop
         vShade = .74 + aRnd.x * .22; vTone = aRnd.y;
         #include <fog_vertex>
       }`,
