@@ -11,7 +11,7 @@ import { sandTextures, stoneTexture, createTerrain, createPour, createDrift } fr
 
 // Swap this for the high-resolution museum clip. Landscape fills the screen;
 // portrait is shown sharp in the centre over a blurred fill.
-const VIDEO_SRC = 'assets/museum.mp4';
+const VIDEO_SRC = 'assets/museum_scrub.mp4';   // re-encoded with a keyframe every 6 frames so scrubbing never decodes far
 
 const MOBILE = matchMedia('(max-width: 760px)').matches;
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -72,7 +72,8 @@ const K = {
 // ---------- renderer / scene ----------
 const canvas = document.getElementById('gl');
 const renderer = new THREE.WebGLRenderer({ canvas, antialias: false, powerPreference: 'high-performance' });
-const DPR = Math.min(devicePixelRatio, MOBILE ? 1.5 : 1.75);
+const DPR_MAX = Math.min(devicePixelRatio, MOBILE ? 1.5 : 1.75), DPR_MIN = Math.min(devicePixelRatio, MOBILE ? .85 : 1);
+let DPR = DPR_MAX;   // lowered at runtime if frames run long (see the frame loop)
 renderer.setPixelRatio(DPR);
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
@@ -122,12 +123,17 @@ const rim = new THREE.DirectionalLight(0xdcdfff, 0); rim.position.set(-3, 3, -5)
 const manager = new THREE.LoadingManager();
 const pctEl = document.getElementById('pct'), barEl = document.getElementById('bar');
 manager.onProgress = (_, l, t) => { pctEl.textContent = Math.round(l / t * 100) + '%'; barEl.style.transform = `scaleX(${l / t})`; };
-manager.itemStart('rose.bin'); manager.itemStart(VIDEO_SRC); manager.itemStart('fonts');
+manager.itemStart('rose.bin'); manager.itemStart('fonts');
+// start every download now, in parallel, before the procedural sand textures tie up the main thread
+const roseBin = fetch('assets/rose_q.bin').then(r => r.arrayBuffer());
 // brand fonts gate the loader so the first frame is already set in Lyon / GT America
 const fontsReady = Promise.all(['400 40px "Lyon Display"', '500 40px "Lyon Display"', '400 16px "Lyon Text"', '700 16px "Lyon Text"', '400 13px "GT America"', '500 13px "GT America"']
   .map(f => document.fonts.load(f))).catch(() => {}).finally(() => manager.itemEnd('fonts'));
 const texLoader = new THREE.TextureLoader(manager);
-const tex = (f, srgb) => { const t = texLoader.load('assets/' + f); t.anisotropy = renderer.capabilities.getMaxAnisotropy(); if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t; };
+// each map is uploaded to the GPU as soon as it arrives, not on its first draw
+const tex = (f, srgb) => { const t = texLoader.load('assets/' + f, t => renderer.initTexture(t)); t.anisotropy = renderer.capabilities.getMaxAnisotropy(); if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t; };
+const K1 = MOBILE ? '_1k' : '';   // phones get 1024 px maps
+const roseMaps = { map: tex(`rose_color${K1}.webp`, true), normalMap: tex(`rose_normal${K1}.webp`), aoMap: tex('rose_ao.webp') };
 
 // ---------- desert ----------
 const desert = new THREE.Group(); scene.add(desert);
@@ -197,14 +203,20 @@ const box = (() => {
 const rose = new THREE.Group(); scene.add(rose);
 let roseMat = null, roseMesh = null;
 const hotPts = [];
-fetch('assets/rose.bin').then(r => r.arrayBuffer()).then(b => {
-  const [nv, ni] = new Uint32Array(b, 0, 2), g = new THREE.BufferGeometry();
-  g.setAttribute('position', new THREE.BufferAttribute(new Float32Array(b, 8, nv * 3), 3));
-  g.setAttribute('normal', new THREE.BufferAttribute(new Float32Array(b, 8 + nv * 12, nv * 3), 3));
-  g.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(b, 8 + nv * 24, nv * 2), 2));
-  g.setIndex(new THREE.BufferAttribute(new Uint32Array(b, 8 + nv * 32, ni), 1));
+roseBin.then(b => {
+  // quantized mesh (RQ02): u16 positions and UVs scaled to their bounds, i8 normals, u16 indices
+  const [nv, ni] = new Uint32Array(b, 4, 2), f = new Float32Array(b, 12, 10), g = new THREE.BufferGeometry();
+  const pad4 = n => (n + 3) & ~3, oP = 52, oN = oP + pad4(nv * 6), oU = oN + pad4(nv * 3), oI = oU + nv * 4;
+  const qp = new Uint16Array(b, oP, nv * 3), qn = new Int8Array(b, oN, nv * 3), qu = new Uint16Array(b, oU, nv * 2);
+  const pos = new Float32Array(nv * 3), nor = new Float32Array(nv * 3), uv = new Float32Array(nv * 2);
+  for (let i = 0; i < nv * 3; i++) { const k = i % 3; pos[i] = f[k] + qp[i] / 65535 * (f[3 + k] - f[k]); nor[i] = qn[i] / 127; }
+  for (let i = 0; i < nv * 2; i++) { const k = i % 2; uv[i] = f[6 + k] + qu[i] / 65535 * (f[8 + k] - f[6 + k]); }
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.BufferAttribute(nor, 3)); g.normalizeNormals();
+  g.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  g.setIndex(new THREE.BufferAttribute(new Uint16Array(b, oI, ni), 1));
   roseMat = new THREE.MeshPhysicalMaterial({
-    map: tex('rose_color.jpg', true), normalMap: tex('rose_normal.jpg'), aoMap: tex('rose_ao.jpg'),
+    ...roseMaps,
     roughness: .95, clearcoat: 0, clearcoatRoughness: .25, envMapIntensity: .35
   });
   roseMesh = new THREE.Mesh(g, roseMat);
@@ -225,17 +237,22 @@ fetch('assets/rose.bin').then(r => r.arrayBuffer()).then(b => {
 // ---------- museum video (scroll-scrubbed) ----------
 const vLayer = document.getElementById('museum'), vCan = document.getElementById('museumCanvas'), vCtx = vCan.getContext('2d');
 const vSharp = document.createElement('canvas'), sCtx = vSharp.getContext('2d');
+const vBlur = document.createElement('canvas'), bCtx = vBlur.getContext('2d');
 const vid = document.getElementById('museumVideo');
-let vReady = false, vSeeking = false, vSeekAt = 0, vDone = false;
-const videoDone = () => { if (!vDone) { vDone = true; manager.itemEnd(VIDEO_SRC); } };
-setTimeout(videoDone, 8000);          // never let a slow or unsupported video hold the page hostage
-fetch(VIDEO_SRC).then(r => r.blob()).then(b => {
-  vid.addEventListener('loadeddata', () => {
-    vid.play().then(() => vid.pause()).catch(() => {});
-    vReady = true; drawVideo(); videoDone();
-  }, { once: true });
-  vid.src = URL.createObjectURL(b); vid.load();
-}).catch(videoDone);
+let vReady = false, vSeeking = false, vSeekAt = 0, vFailed = false, vWait = -1;
+// The clip isn't needed until t = 4.6, so it loads after the page opens instead of holding up the loader.
+// A move past it waits for the clip (vWait) rather than scrubbing a blank canvas.
+const videoDone = ok => { if (!ok) vFailed = true; if (vWait >= 0) { const i = vWait; vWait = -1; goTo(i); } };
+function loadVideo() {
+  fetch(VIDEO_SRC).then(r => r.blob()).then(b => {
+    vid.addEventListener('loadeddata', () => {
+      vid.play().then(() => vid.pause()).catch(() => {});
+      vReady = true; drawVideo(); videoDone(true);
+    }, { once: true });
+    vid.addEventListener('error', () => videoDone(false), { once: true });
+    vid.src = URL.createObjectURL(b); vid.load();
+  }).catch(() => videoDone(false));
+}
 vid.addEventListener('seeked', () => { vSeeking = false; drawVideo(); });
 function drawVideo() {
   const W = vCan.width, H = vCan.height, vw = vid.videoWidth, vh = vid.videoHeight;
@@ -244,7 +261,13 @@ function drawVideo() {
   const cover = Math.max(W / vw, H / vh), contain = Math.min(W / vw, H / vh);
   if (vw / vh >= (W / H) * .75) draw(cover);
   else {
-    vCtx.filter = 'blur(40px) brightness(.45)'; draw(cover * 1.1); vCtx.filter = 'none';
+    // blurred fill: draw the frame at 1/24 size, soften it there and scale it up (nearly free; a canvas blur() filter at
+    // full retina size costs ~20 ms per scrubbed frame), then dim it
+    const bw = Math.max(8, Math.round(W / 24)), bh = Math.max(8, Math.round(H / 24)), bs = Math.max(bw / vw, bh / vh) * 1.1;
+    if (vBlur.width !== bw || vBlur.height !== bh) { vBlur.width = bw; vBlur.height = bh; }
+    bCtx.filter = 'blur(2px)'; bCtx.drawImage(vid, (bw - vw * bs) / 2, (bh - vh * bs) / 2, vw * bs, vh * bs);
+    vCtx.imageSmoothingQuality = 'high'; vCtx.drawImage(vBlur, 0, 0, W, H);
+    vCtx.fillStyle = 'rgba(0,0,0,.55)'; vCtx.fillRect(0, 0, W, H);
     // sharp footage, feathered into the blurred fill; on wide screens it sits right of centre, clear of the text
     const w = vw * contain, h = vh * contain, x = W > H ? Math.min(W - w * 1.05, W * .62 - w / 2) : (W - w) / 2, f = w * .14;
     if (vSharp.width !== W || vSharp.height !== H) { vSharp.width = W; vSharp.height = H; }
@@ -311,6 +334,7 @@ let cur = 0, movingSince = 0, started = false;
 function goTo(i) {
   i = Math.max(0, Math.min(STOPS.length - 1, i));
   if (i === cur && !movingSince) return;
+  if (STOPS[i] > 4.6 && !vReady && !vFailed) { vWait = i; return; }   // museum clip still downloading
   const from = timeline(lenis.scroll);
   cur = i; movingSince = performance.now();
   lenis.scrollTo(tToY(STOPS[i]), { duration: REDUCED ? .5 : moveTime(from, STOPS[i]), easing: easeSine, force: true, onComplete: () => { movingSince = 0; } });
@@ -360,7 +384,7 @@ addEventListener('pointerup', () => drag.down = false);
 let W = 1, H = 1;
 function resize() {
   W = innerWidth; H = innerHeight;
-  sky.material.uniforms.uRes.value.set(W * renderer.getPixelRatio(), H * renderer.getPixelRatio()); renderer.setSize(W, H); composer.setSize(W, H); bloom.resolution.set(W, H);
+  sky.material.uniforms.uRes.value.set(W * renderer.getPixelRatio(), H * renderer.getPixelRatio()); renderer.setSize(W, H); composer.setSize(W, H); bloom.resolution.set(W / 2, H / 2);   // bloom is soft anyway; half-res halves its cost
   camera.aspect = W / H; camera.updateProjectionMatrix();
   vCan.width = W * Math.min(devicePixelRatio, 2); vCan.height = H * Math.min(devicePixelRatio, 2); drawVideo();
   measure();
@@ -386,6 +410,7 @@ function update(t, time, dt) {
   sky.material.uniforms.uStudio.value = inDesert ? 0 : 1;
   grade.uniforms.uVig.value = inDesert ? .5 : 0;   // the gallery backdrop stays one colour edge to edge
   hemi.color.setHex(inDesert ? 0x9fb6e0 : 0xffe2c4); hemi.groundColor.setHex(inDesert ? 0xa8743f : 0x2a1a10);
+  sun.shadow.autoUpdate = inDesert; spot.shadow.autoUpdate = !inDesert;   // only the active light redraws its shadow map
   sun.intensity = inDesert ? 2.1 : 0; hemi.intensity = inDesert ? .45 : .12;
   fill.intensity = inDesert ? .22 : .3; spot.intensity = inDesert ? 0 : 3.4; rim.intensity = inDesert ? 0 : .7;
   renderer.toneMappingExposure = track(K.exposure, t);
@@ -394,6 +419,7 @@ function update(t, time, dt) {
   // sand
   const mound = 1 - .82 * smooth(t);
   terrain.userData.mound.value = mound;
+  if (pour) pour.visible = t < .98;   // every grain has settled by the first stop
   if (pour) { const u = pour.material.uniforms; u.uT.value = t; u.uMound.value = mound; u.uScale.value = H * DPR * .5 * camera.projectionMatrix.elements[5]; }
   const storm = track(K.storm, t), du = drift.material.uniforms;
   du.uScale.value = H * DPR * .5 * camera.projectionMatrix.elements[5]; du.uTime.value = time;
@@ -484,11 +510,33 @@ renderer.setAnimationLoop(now => {
   rose.updateMatrixWorld();
   const covered = update(t, time, dt);
   grade.uniforms.uTime.value = time;
-  if (!covered) composer.render();
+  if (!covered) { composer.render(); adapt(dt); }
 });
 
-manager.onLoad = () => {
-  if (started) return; started = true;
+// Adaptive resolution: if frames keep running long (a weak GPU, a hi-dpi laptop on battery), step the pixel
+// ratio down so motion stays smooth; step back up only after a long run of fast frames. Each change
+// reallocates the render targets, so changes are rare and spaced out.
+let slow = 0, fast = 0, lastAdapt = 0;
+function adapt(dt) {
+  if (!started || document.hidden) return;
+  if (dt > 1 / 45) { slow++; fast = 0; } else if (dt < 1 / 75) { fast++; slow = Math.max(0, slow - 1); } else slow = Math.max(0, slow - 1);
+  const now = performance.now(), next = slow > 30 && DPR > DPR_MIN ? Math.max(DPR_MIN, DPR - .25) : fast > 600 && DPR < DPR_MAX ? Math.min(DPR_MAX, DPR + .25) : DPR;
+  if (next !== DPR && now - lastAdapt > 2000) { DPR = next; lastAdapt = now; slow = fast = 0; renderer.setPixelRatio(DPR); resize(); }
+}
+
+// Warm-up: draw each phase once behind the loader so every shader is compiled, every texture uploaded
+// and every shadow map built before the visitor scrolls (otherwise each first appearance hitches).
+async function warmUp() {
+  const show = [desert, gallery, box.g].map(o => [o, o.visible]);
+  show.forEach(([o]) => o.visible = true);
+  try { await renderer.compileAsync(scene, camera); } catch {}
+  show.forEach(([o, v]) => o.visible = v);
+  for (const t of [.5, 2.2, 6.5, 7.4]) { update(t, 0, 0); composer.render(); }
+}
+manager.onLoad = async () => {
+  if (started) return;
+  await warmUp();
+  started = true; loadVideo();
   measure(); introAt = performance.now() / 1000;
   document.body.classList.add('ready');
   // Lenis stays stopped: scrolling only happens through goTo().

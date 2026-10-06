@@ -103,9 +103,29 @@ footer{position:relative;z-index:4;padding:28px 8vw;font:400 12px var(--sans);co
 @media(prefers-reduced-motion:reduce){.card>*{transition:none}}
 </style>
 <script type="importmap">{"imports":{
-  "three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.min.js",
   "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
   "lenis":"https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.mjs"}}</script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
+<!-- fetch the whole module graph in parallel instead of discovering it import by import -->
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.min.js" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.mjs" crossorigin>
+<link rel="modulepreload" href="js/main.js">
+<link rel="modulepreload" href="js/sand.js">
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/postprocessing/EffectComposer.js" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/postprocessing/RenderPass.js" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/postprocessing/UnrealBloomPass.js" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/postprocessing/ShaderPass.js" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/postprocessing/OutputPass.js" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/postprocessing/Pass.js" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/postprocessing/MaskPass.js" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/shaders/CopyShader.js" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/shaders/LuminosityHighPassShader.js" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/shaders/OutputShader.js" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/environments/RoomEnvironment.js" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/geometries/RoundedBoxGeometry.js" crossorigin>
+<link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/math/MeshSurfaceSampler.js" crossorigin>
+<link rel="preload" href="assets/rose_q.bin" as="fetch" crossorigin>
 </head>
 <body>
 <canvas id="gl" aria-hidden="true"></canvas>
