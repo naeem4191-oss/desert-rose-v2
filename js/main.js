@@ -59,7 +59,8 @@ const K = {
   bloom: [[0, .2], [4.05, .2], [4.6, 1.5, 'in'], [4.62, .25]],
   flash: [[4.4, 0], [4.6, 1, 'in'], [4.95, 0, 'out']],
   video: [[4.56, 0], [4.6, 1, 'lin']],
-  iris: [[5.85, 1], [6.15, 0, 'in']],
+  iris: [[5.85, 1], [6.2, 0, 'io']],   // video → gift box: footage pushes in, blurs and dissolves (mirrors the dive in)
+  pull: [[5.84, 1], [5.85, .5, 'lin'], [6.35, 1, 'out']],   // camera distance factor: starts close on the box and pulls back as the video clears
   hots: [[2.7, 0], [2.85, 1], [3.35, 1], [3.5, 0]],
   homeY: [[5.85, 1.35], [6.3, .045]],
   roseScale: [[5.8, 1], [5.85, .42], [6.9, .42], [7.2, 1]],
@@ -435,7 +436,7 @@ function update(t, time, dt) {
   const dFit = Math.max(ROSE_HALF_H / (tanV * FIT_H), ROSE_HALF_W / (tanV * camera.aspect * fitW));
   const dKey = pos.distanceTo(tgt) * (camera.aspect < 1 ? 1 + (1 - camera.aspect) * 2.2 : 1);
   const intro = REDUCED ? 0 : 1 - EASE.out(clamp01((time - introAt) / 3.2));
-  v3.subVectors(pos, tgt).setLength((dKey + (dFit - dKey) * fit) * (1 + intro * .35));
+  v3.subVectors(pos, tgt).setLength((dKey + (dFit - dKey) * fit) * (1 + intro * .35) * track(K.pull, t));
   pos.copy(tgt).add(v3);
   if (storm > 0) { pos.x += Math.sin(time * 23) * .025 * storm; pos.y += Math.sin(time * 31) * .018 * storm; }
   if (camera.aspect < 1) { shift = 0; lift = (.17 + .07 * smooth((t - 6.9) / .4)) * (1 - (t > 4 && t < 4.6 ? smooth((t - 4) / .5) : 0)); }   // centre again for the dive
@@ -445,11 +446,12 @@ function update(t, time, dt) {
 
   // museum video, flash, iris
   const vo = track(K.video, t), iris = track(K.iris, t);
-  vLayer.style.opacity = vo;
-  vLayer.style.clipPath = iris < 1 ? `circle(${iris * 75}% at 50% 50%)` : 'none';
+  const out = 1 - iris;
+  vLayer.style.opacity = vo * (1 - out * out);
+  vCan.style.filter = out > 0 ? `blur(${out * 28}px) brightness(${1 - out * .35})` : 'none';
   if (vo > 0) {
     const f = clamp01((t - 4.6) / .9);
-    scrubVideo(f); vCan.style.transform = `scale(${1.08 - .08 * f})`;
+    scrubVideo(f); vCan.style.transform = `scale(${1.08 - .08 * f + out * out * .35})`;
   }
   hud.flash.style.opacity = track(K.flash, t);
 
