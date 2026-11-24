@@ -22,6 +22,8 @@ python3 serve.py        # http://localhost:8765, serves its own folder with Cach
 - remote `v2` → https://naeem4191-oss.github.io/desert-rose-v2/ is the current version, and local `main` tracks it, so a plain `git push` goes there.
 - remote `origin` → https://naeem4191-oss.github.io/desert-rose/ is the original version and is intentionally left at its first commit. Don't push to it unless asked.
 
+**Before each deploy, run `tools/bump_version.sh`.** GitHub Pages lets browsers keep files for 10 minutes, so an update that reuses a file name would otherwise show the old copy. The script sets a new `?v=` in `index.html` (the script tag, the modulepreloads, the `rose_q.bin` preload and the import map entry for `sand.js`). `main.js` reads it from its own URL (`VER`) and appends it to every asset it loads. `index.html` itself can still be cached for up to 10 minutes.
+
 ## Architecture
 
 **One timeline drives everything.** Each `<section data-sec>` in `index.html` is one timeline unit: section *i* covers `t ∈ [i, i+1)`. `timeline(y)` in `js/main.js` maps scroll position to `t` from the measured section tops and heights. All 3D state, overlays and HUD are pure functions of `t` (plus wall-clock time for idle motion) inside `update(t, time, dt)`. The keyframe tracks in the `K` object are `[t, value, ease?]` lists evaluated with `track(keys, t)`. Scrolling back reverses everything exactly. The sand grains are fully deterministic in their shader for the same reason.

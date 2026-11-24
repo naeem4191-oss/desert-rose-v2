@@ -105,13 +105,17 @@ footer{position:relative;z-index:4;padding:28px 8vw;font:400 12px var(--sans);co
 <script type="importmap">{"imports":{
   "three":"https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.min.js",
   "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/",
-  "lenis":"https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.mjs"}}</script>
+  "lenis":"https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.mjs",
+  "./js/sand.js":"./js/sand.js?v=202611241108"}}</script>
+<!-- ?v= is the cache-busting version (bump it with tools/bump_version.sh before deploying): GitHub Pages lets
+     browsers keep files for 10 min, so an update reusing a file name would otherwise show the old copy. main.js
+     reads it from its own URL and adds it to the assets it loads; the import map entry carries it to sand.js. -->
 <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin>
 <!-- fetch the whole module graph in parallel instead of discovering it import by import -->
 <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.min.js" crossorigin>
 <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/lenis@1.1.18/dist/lenis.mjs" crossorigin>
-<link rel="modulepreload" href="js/main.js">
-<link rel="modulepreload" href="js/sand.js">
+<link rel="modulepreload" href="js/main.js?v=202611241108">
+<link rel="modulepreload" href="js/sand.js?v=202611241108">
 <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/postprocessing/EffectComposer.js" crossorigin>
 <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/postprocessing/RenderPass.js" crossorigin>
 <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/postprocessing/UnrealBloomPass.js" crossorigin>
@@ -125,7 +129,7 @@ footer{position:relative;z-index:4;padding:28px 8vw;font:400 12px var(--sans);co
 <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/environments/RoomEnvironment.js" crossorigin>
 <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/geometries/RoundedBoxGeometry.js" crossorigin>
 <link rel="modulepreload" href="https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/math/MeshSurfaceSampler.js" crossorigin>
-<link rel="preload" href="assets/rose_q.bin" as="fetch" crossorigin>
+<link rel="preload" href="assets/rose_q.bin?v=202611241108" as="fetch" crossorigin>
 </head>
 <body>
 <canvas id="gl" aria-hidden="true"></canvas>
@@ -196,6 +200,6 @@ footer{position:relative;z-index:4;padding:28px 8vw;font:400 12px var(--sans);co
 </main>
 <footer>Desert Rose · Resin sculpture · Qatar</footer>
 
-<script type="module" src="js/main.js"></script>
+<script type="module" src="js/main.js?v=202611241108"></script>
 </body>
 </html>

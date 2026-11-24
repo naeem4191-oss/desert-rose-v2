@@ -10,11 +10,12 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import { sandTextures, stoneTexture, createTerrain, createPour, createDrift } from './sand.js';
 
 const MOBILE = matchMedia('(max-width: 760px)').matches;
+const VER = new URL(import.meta.url).search;   // '?v=…' from index.html, added to every asset URL so a deploy is never served from a stale cache
 // Museum clip, built by tools/museum_cut.sh: 1280×854 on desktop; on phones 720×1280 with the museum in the top 60%, clear of the card.
 // AV1 where the browser decodes it (~30% smaller), H.264 otherwise. Landscape fills the screen;
 // portrait on a wide screen is shown sharp over a blurred fill.
 const VIDEO_SRC = `assets/museum_scrub${MOBILE ? '_m' : ''}${
-  document.createElement('video').canPlayType('video/mp4; codecs="av01.0.05M.10"') ? '_av1' : ''}.mp4`;
+  document.createElement('video').canPlayType('video/mp4; codecs="av01.0.05M.10"') ? '_av1' : ''}.mp4${VER}`;
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const START_Y = -1.0;       // rose depth when buried
 const BG_GRAD = new URLSearchParams(location.search).get('bg') === 'grad';   // review switch: ?bg=grad
@@ -126,13 +127,13 @@ const pctEl = document.getElementById('pct'), barEl = document.getElementById('b
 manager.onProgress = (_, l, t) => { pctEl.textContent = Math.round(l / t * 100) + '%'; barEl.style.transform = `scaleX(${l / t})`; };
 manager.itemStart('rose.bin'); manager.itemStart('fonts');
 // start every download now, in parallel, before the procedural sand textures tie up the main thread
-const roseBin = fetch('assets/rose_q.bin').then(r => r.arrayBuffer());
+const roseBin = fetch('assets/rose_q.bin' + VER).then(r => r.arrayBuffer());
 // brand fonts gate the loader so the first frame is already set in Lyon / GT America
 const fontsReady = Promise.all(['400 40px "Lyon Display"', '500 40px "Lyon Display"', '400 16px "Lyon Text"', '700 16px "Lyon Text"', '400 13px "GT America"', '500 13px "GT America"']
   .map(f => document.fonts.load(f))).catch(() => {}).finally(() => manager.itemEnd('fonts'));
 const texLoader = new THREE.TextureLoader(manager);
 // each map is uploaded to the GPU as soon as it arrives, not on its first draw
-const tex = (f, srgb) => { const t = texLoader.load('assets/' + f, t => renderer.initTexture(t)); t.anisotropy = renderer.capabilities.getMaxAnisotropy(); if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t; };
+const tex = (f, srgb) => { const t = texLoader.load('assets/' + f + VER, t => renderer.initTexture(t)); t.anisotropy = renderer.capabilities.getMaxAnisotropy(); if (srgb) t.colorSpace = THREE.SRGBColorSpace; return t; };
 const K1 = MOBILE ? '_1k' : '';   // phones get 1024 px maps
 const roseMaps = { map: tex(`rose_color${K1}.webp`, true), normalMap: tex(`rose_normal${K1}.webp`), aoMap: tex('rose_ao.webp') };
 
@@ -515,14 +516,19 @@ renderer.setAnimationLoop(now => {
 });
 
 // Adaptive resolution: if frames keep running long (a weak GPU, a hi-dpi laptop on battery), step the pixel
-// ratio down so motion stays smooth; step back up only after a long run of fast frames. Each change
-// reallocates the render targets, so changes are rare and spaced out.
-let slow = 0, fast = 0, lastAdapt = 0;
+// ratio down so motion stays smooth; step back up only after a long run of fast frames.
+// A running average of frame time catches intermittent drops (one frame in five at 33 ms averages ~20 ms),
+// which a count of consecutive slow frames misses. Each change reallocates the render targets and re-measures
+// the page (a ~200 ms stall), so it's applied only at rest on a stop, never mid-move.
+let ema = 1 / 60, fastFor = 0, lastAdapt = 0;
 function adapt(dt) {
   if (!started || document.hidden) return;
-  if (dt > 1 / 45) { slow++; fast = 0; } else if (dt < 1 / 75) { fast++; slow = Math.max(0, slow - 1); } else slow = Math.max(0, slow - 1);
-  const now = performance.now(), next = slow > 30 && DPR > DPR_MIN ? Math.max(DPR_MIN, DPR - .25) : fast > 600 && DPR < DPR_MAX ? Math.min(DPR_MAX, DPR + .25) : DPR;
-  if (next !== DPR && now - lastAdapt > 2000) { DPR = next; lastAdapt = now; slow = fast = 0; renderer.setPixelRatio(DPR); resize(); }
+  ema += (dt - ema) * .05;
+  fastFor = ema < 1 / 75 ? fastFor + 1 : 0;
+  const now = performance.now();
+  if (movingSince || now - lastAdapt < 2500) return;
+  const next = ema > 1 / 52 && DPR > DPR_MIN ? Math.max(DPR_MIN, DPR - .25) : fastFor > 600 && DPR < DPR_MAX ? Math.min(DPR_MAX, DPR + .25) : DPR;
+  if (next !== DPR) { DPR = next; lastAdapt = now; ema = 1 / 60; fastFor = 0; renderer.setPixelRatio(DPR); resize(); }
 }
 
 // Warm-up: draw each phase once behind the loader so every shader is compiled, every texture uploaded
