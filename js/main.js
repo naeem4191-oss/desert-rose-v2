@@ -9,11 +9,12 @@ import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
 import { sandTextures, stoneTexture, createTerrain, createPour, createDrift } from './sand.js';
 
-// Swap this for the high-resolution museum clip. Landscape fills the screen;
-// portrait is shown sharp in the centre over a blurred fill.
-const VIDEO_SRC = 'assets/museum_scrub.mp4';   // re-encoded with a keyframe every 6 frames so scrubbing never decodes far
-
 const MOBILE = matchMedia('(max-width: 760px)').matches;
+// Museum clip, built by tools/museum_cut.sh: 1280×854 on desktop; on phones 720×1280 with the museum in the top 60%, clear of the card.
+// AV1 where the browser decodes it (~30% smaller), H.264 otherwise. Landscape fills the screen;
+// portrait on a wide screen is shown sharp over a blurred fill.
+const VIDEO_SRC = `assets/museum_scrub${MOBILE ? '_m' : ''}${
+  document.createElement('video').canPlayType('video/mp4; codecs="av01.0.05M.10"') ? '_av1' : ''}.mp4`;
 const REDUCED = matchMedia('(prefers-reduced-motion: reduce)').matches;
 const START_Y = -1.0;       // rose depth when buried
 const BG_GRAD = new URLSearchParams(location.search).get('bg') === 'grad';   // review switch: ?bg=grad

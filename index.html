@@ -67,7 +67,7 @@ header,.rail{transition:color .8s,background .8s,opacity 1.5s .6s}
 main{position:relative;z-index:4}
 section{position:relative}
 .pin{position:sticky;top:0;height:100vh;display:flex;align-items:center;padding:0 8vw;pointer-events:none}
-.pin.r{justify-content:flex-end}.pin.c{justify-content:center;text-align:center}.pin.b{align-items:flex-end;padding-bottom:12vh}
+.pin.r{justify-content:flex-end}.pin.c{justify-content:center;text-align:center}.pin.b{align-items:flex-end;padding-bottom:12vh}.pin.t{align-items:flex-start;padding-top:16vh}
 .card{max-width:440px;pointer-events:auto}
 .c .card{max-width:640px}
 .card>*{opacity:0;transform:translateY(26px);transition:opacity 1s var(--ease),transform 1.2s var(--ease)}
@@ -91,7 +91,7 @@ footer{position:relative;z-index:4;padding:28px 8vw;font:400 12px var(--sans);co
 
 @media(max-width:760px){
   header{padding:16px}nav{display:none}.rail{display:none}
-  .pin,.pin.r,.pin.c,.pin.b{align-items:flex-end;justify-content:flex-start;text-align:left;padding:0}
+  .pin,.pin.r,.pin.c,.pin.b,.pin.t{align-items:flex-end;justify-content:flex-start;text-align:left;padding:0}
   .pin.r .card{text-align:left}.pin.r .card p{margin-left:0}.pin.r .chips{justify-content:flex-start}
   /* full-bleed soft scrim behind the text, in the page's plum (sand over the desert) */
   .card{width:100%;max-width:none;padding:22vh 16px max(7vh,env(safe-area-inset-bottom));background:linear-gradient(180deg,rgba(58,34,53,0),rgba(58,34,53,.55) 35%,rgba(58,34,53,.9) 70%)}
@@ -176,7 +176,7 @@ footer{position:relative;z-index:4;padding:28px 8vw;font:400 12px var(--sans);co
     <h2>Look <em>closer.</em></h2>
   </div></div></section>
 
-  <section data-sec style="height:200vh"><div class="pin b"><div class="card">
+  <section data-sec style="height:200vh"><div class="pin t"><div class="card">
     <h2>A rose the size <em>of a city.</em></h2>
     <p>Architect Jean Nouvel drew on the desert rose for the National Museum of Qatar: great curved discs, interlocking like petals, wrapped around the historic palace of Sheikh Abdullah bin Jassim Al Thani.</p>
     <div class="chips"><span>Jean Nouvel</span><span>Opened 2019</span><span>Doha</span></div>
